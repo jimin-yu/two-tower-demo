@@ -3,22 +3,27 @@ import tarfile
 import os
 import shutil
 
+TEMP_DIR = 'temp'
+
 class SaveModel:
   def __init__(self, s3_client, bucket_name):
     self.s3_client = s3_client
     self.bucket_name = bucket_name
 
+
   def call(self, model, model_name, signatures=None):
-    if not os.path.exists('temp'):
-        os.makedirs('temp')
-    local_model_path = f'temp/{model_name}'
+    if not os.path.exists(TEMP_DIR):
+        os.makedirs(TEMP_DIR)
+    local_model_path = f'{TEMP_DIR}/{model_name}'
 
     self.__save_model_locally(model, local_model_path, signatures)
     tar_gz_file_name = self.__make_tar_gz(local_model_path)
     self.__upload_to_s3(tar_gz_file_name)
+
   
   def __save_model_locally(self, model, local_path, signatures):
     tf.saved_model.save(model, local_path, signatures=signatures)
+
 
   def __make_tar_gz(self, source_dir):
       tar_gz_file_name = source_dir + ".tar.gz"
@@ -28,6 +33,7 @@ class SaveModel:
           
       shutil.rmtree(source_dir)
       return tar_gz_file_name
+  
   
   def __upload_to_s3(self, local_file_path):
      s3_file_path = os.path.basename(local_file_path)
