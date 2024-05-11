@@ -13,7 +13,10 @@
 # limitations under the License.
 
 from kserve import Model, ModelServer, model_server
-import weaviate
+from pymilvus import MilvusClient
+import mysql.connector as sql
+import pandas as pd
+from db_config import *
 
 from kserve.model import PredictorProtocol
 from typing import Dict
@@ -26,14 +29,22 @@ from tritonclient.grpc import InferResult, InferInput
 class RankingTransformer(Model):
     def __init__(self):
         super().__init__(name)
-        self.weaviate_client = weaviate.Client("https://weaviate.dev.sinsang.market")
-        self.candidate_index_name = 'ItemCandidate'
+        # create vector db client
+        self.milvus_client = MilvusClient(uri='http://milvus.dev.sinsang.market:19530')
+        self.collection_name = 'rec_candidate'
 
+        # get feature views
+        db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=username, password=password)
+        self.articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=db_connection)
+        self.articles_features = articles_fv.columns.to_list()
+        self.customer_fv = pd.read_sql('SELECT * FROM rec_customers', con=db_connection)
 
-
-        self.predictor_host = predictor_host
-        self.protocol = protocol
-        self.ready = True
+        # get ranking model feature names
+        mr = project.get_model_registry()
+        model = mr.get_model(os.environ["MODEL_NAME"], os.environ["MODEL_VERSION"])
+        input_schema = model.model_schema["input_schema"]["columnar_schema"]
+        
+        self.ranking_model_feature_names = [feat["name"] for feat in input_schema]
 
     def preprocess(self, request: Dict) -> ModelInferRequest:
         # Input follows the Tensorflow V1 HTTP API for binary values
@@ -66,14 +77,14 @@ class RankingTransformer(Model):
             return infer_response
     
     def search_candidates(self, query_emb, k=100):
-        nearVector = {"vector": query_emb}
-        result = self.weaviate_client.query.get(
-            self.candidate_index_name, ["item_id"]
-        ).with_near_vector(
-            nearVector
-        ).with_limit(k).do()
-
-        
+        res = client.search(
+            collection_name=self.collection_name, 
+            data=[query_emb], 
+            ann_fields="vector",
+            limit=k,
+            output_fields=["id"]
+        )
+        return [item['id'] for item in res[0]]
 
 
 parser = argparse.ArgumentParser(parents=[model_server.parser])

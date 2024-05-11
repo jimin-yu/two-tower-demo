@@ -1,0 +1,17 @@
+# catboost 모듈 추가한 이미지
+apiVersion: serving.kserve.io/v1alpha1
+kind: ClusterServingRuntime
+metadata:
+  name: custom-sklearn-runtime
+spec:
+  supportedModelFormats:
+    - name: sklearn
+      version: "1"
+      autoSelect: true
+  containers:
+    - name: kserve-container
+      image: jjmmyyou111/sklearnserver:latest
+      args:
+        - --model_name={{.Name}}
+        - --model_dir=/mnt/models
+        - --http_port=8080
