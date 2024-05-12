@@ -11,6 +11,8 @@ class CatBoostModel(kserve.Model):
 
     def load(self):
         self.model = joblib.load('model.pkl')
+        self.model.eval()
+        self.ready = True
 
     def predict(self, payload: Dict) -> Dict:
         input_data = payload["inputs"][0]
