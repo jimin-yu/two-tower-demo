@@ -34,7 +34,7 @@ class RankingTransformer(Model):
         self.collection_name = 'rec_candidate'
 
         # get feature views
-        db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=username, password=password)
+        db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
         self.articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=db_connection)
         self.articles_features = articles_fv.columns.to_list()
         self.customer_fv = pd.read_sql('SELECT * FROM rec_customers', con=db_connection)
