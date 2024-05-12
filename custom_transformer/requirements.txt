@@ -1,4 +1,5 @@
 mysql-connector-python
 pandas
+numpy
 kserve
 pymilvus

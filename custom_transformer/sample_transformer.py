@@ -8,6 +8,7 @@ import pandas as pd
 
 from pymilvus import MilvusClient
 import json
+import numpy as np
 
 class SampleTransformer(Model):
     def __init__(self, name: str, predictor_host: str):
@@ -23,7 +24,8 @@ class SampleTransformer(Model):
         print(articles_features)
         print("======================================")
         client = MilvusClient(uri='http://milvus.dev.sinsang.market:19530')
-
+        emb_dim = 16
+        embedding = np.random.rand(emb_dim)
         res = client.search(
         collection_name="rec_candidate", 
         data=[embedding], 
@@ -33,7 +35,7 @@ class SampleTransformer(Model):
         )
         print(json.dumps(res, indent=2))
         print([item['id'] for item in res[0]])
-        
+
         return inputs
 
     def postprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
