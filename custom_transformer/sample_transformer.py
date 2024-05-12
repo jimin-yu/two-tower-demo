@@ -2,6 +2,10 @@ from kserve import Model, ModelServer, model_server
 import argparse
 from typing import Dict
 
+from db_config import *
+import mysql.connector as sql
+import pandas as pd
+
 class SampleTransformer(Model):
     def __init__(self, name: str, predictor_host: str):
         super().__init__(name)
