@@ -1,5 +1,6 @@
 from kserve import Model, ModelServer, model_server
 import argparse
+from typing import Dict
 
 class SampleTransformer(Model):
     def __init__(self, name: str, predictor_host: str):
