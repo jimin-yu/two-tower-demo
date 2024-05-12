@@ -11,21 +11,20 @@ class CatBoostModel(kserve.Model):
 
     def load(self):
         self.model = joblib.load('model.pkl')
-        self.model.eval()
         self.ready = True
 
-    def predict(self, payload: Dict) -> Dict:
+    def predict(self, payload: Dict, headers: Dict[str, str] = None) -> Dict:
         input_data = payload["inputs"][0]
         ranking_features = input_data["ranking_features"]
         articles_id = input_data["articles_id"]
         
         input_df = pd.DataFrame(ranking_features)
-        scores = self.model.predict_proba(input_df)[:,1]
+        result = self.model.predict_proba(input_df)
+        scores = result[:,1].tolist()
         predictions = { "scores": scores, "articles_id": articles_id }
 
         return {"predictions": predictions}
 
 if __name__ == "__main__":
     model = CatBoostModel("custom-catboost-model")
-    model.load()
     kserve.ModelServer().start([model])
