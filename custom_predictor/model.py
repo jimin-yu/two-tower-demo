@@ -27,4 +27,5 @@ class CatBoostModel(kserve.Model):
 
 if __name__ == "__main__":
     model = CatBoostModel("custom-catboost-model")
+    model.load()
     kserve.ModelServer().start([model])
