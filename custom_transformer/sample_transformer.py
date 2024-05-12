@@ -6,6 +6,9 @@ from db_config import *
 import mysql.connector as sql
 import pandas as pd
 
+from pymilvus import MilvusClient
+import json
+
 class SampleTransformer(Model):
     def __init__(self, name: str, predictor_host: str):
         super().__init__(name)
@@ -18,6 +21,19 @@ class SampleTransformer(Model):
         articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=db_connection)
         articles_features = articles_fv.columns.to_list()   
         print(articles_features)
+        print("======================================")
+        client = MilvusClient(uri='http://milvus.dev.sinsang.market:19530')
+
+        res = client.search(
+        collection_name="rec_candidate", 
+        data=[embedding], 
+        ann_fields="vector",
+        limit=20,
+        output_fields=["id"]
+        )
+        print(json.dumps(res, indent=2))
+        print([item['id'] for item in res[0]])
+        
         return inputs
 
     def postprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
