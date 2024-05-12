@@ -8,11 +8,11 @@ class SampleTransformer(Model):
         self.predictor_host = predictor_host
         self.ready = True
 
-    def preprocess(self, inputs: Dict) -> Dict:
+    def preprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
         print("============== preprocess ==============")
         return inputs
 
-    def postprocess(self, inputs: Dict) -> Dict:
+    def postprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
         print("============== preprocess ==============")
         return inputs
 
