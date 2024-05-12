@@ -6,7 +6,7 @@ class SampleTransformer(Model):
     def __init__(self, name: str, predictor_host: str):
         super().__init__(name)
         self.predictor_host = predictor_host
-        self.ready = Trues
+        self.ready = True
 
     def preprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
         print("============== preprocess ==============")
