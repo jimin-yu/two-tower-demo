@@ -24,5 +24,5 @@ class CatBoostModel(kserve.Model):
         return {"predictions": predictions}
 
 if __name__ == "__main__":
-    model = CatBoostModel("catboost-model")
+    model = CatBoostModel("ranking-model")
     kserve.ModelServer().start([model])
