@@ -31,7 +31,7 @@ class RankingTransformer(Model):
         # get feature views
         self.db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
         self.articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=self.db_connection)
-        self.articles_features = articles_fv.columns.to_list()
+        self.articles_features = self.articles_fv.columns.to_list()
         self.customer_fv = pd.read_sql('SELECT * FROM rec_customers', con=self.db_connection)
         
         # TODO: model input schema 가져오는 부분 개선하기
