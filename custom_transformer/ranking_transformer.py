@@ -20,9 +20,6 @@ from db_config import *
 
 from typing import Dict
 import argparse
-import numpy
-import logging
-
 
 class RankingTransformer(Model):
     def __init__(self, name: str, predictor_host: str):
