@@ -19,12 +19,12 @@ class CatBoostModel(kserve.Model):
     def predict(self, payload: Dict, headers: Dict[str, str] = None) -> Dict:
         input_data = payload["inputs"][0]
         ranking_features = input_data["ranking_features"]
-        articles_id = input_data["articles_id"]
+        article_ids = input_data["article_ids"]
         
         input_df = pd.DataFrame(ranking_features)
         result = self.model.predict_proba(input_df)
         scores = result[:,1].tolist()
-        predictions = { "scores": scores, "articles_id": articles_id }
+        predictions = { "scores": scores, "article_ids": article_ids }
 
         return {"predictions": predictions}
 
