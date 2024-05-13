@@ -18,88 +18,135 @@ import mysql.connector as sql
 import pandas as pd
 from db_config import *
 
-from kserve.model import PredictorProtocol
 from typing import Dict
 import argparse
 import numpy
-from tritonclient.grpc.service_pb2 import ModelInferRequest, ModelInferResponse
-from tritonclient.grpc import InferResult, InferInput
+import logging
 
 
 class RankingTransformer(Model):
-    def __init__(self):
+    def __init__(self, name: str, predictor_host: str):
         super().__init__(name)
         # create vector db client
         self.milvus_client = MilvusClient(uri='http://milvus.dev.sinsang.market:19530')
         self.collection_name = 'rec_candidate'
 
         # get feature views
-        db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
-        self.articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=db_connection)
+        self.db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
+        self.articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=self.db_connection)
         self.articles_features = articles_fv.columns.to_list()
-        self.customer_fv = pd.read_sql('SELECT * FROM rec_customers', con=db_connection)
-
-        # get ranking model feature names
-        mr = project.get_model_registry()
-        model = mr.get_model(os.environ["MODEL_NAME"], os.environ["MODEL_VERSION"])
-        input_schema = model.model_schema["input_schema"]["columnar_schema"]
+        self.customer_fv = pd.read_sql('SELECT * FROM rec_customers', con=self.db_connection)
         
-        self.ranking_model_feature_names = [feat["name"] for feat in input_schema]
+        # TODO: model input schema 가져오는 부분 개선하기
+        self.ranking_model_feature_names = ['age', 'month_sin', 'month_cos', 'product_type_name', 'product_group_name', 'graphical_appearance_name', 'colour_group_name', 'perceived_colour_value_name', 'perceived_colour_master_name', 'department_name', 'index_name', 'index_group_name', 'section_name', 'garment_group_name']
+        self.predictor_host = predictor_host
+        self.ready = True
 
-    def preprocess(self, request: Dict) -> ModelInferRequest:
-        # Input follows the Tensorflow V1 HTTP API for binary values
-        # https://www.tensorflow.org/tfx/serving/api_rest#encoding_binary_values
-        input_tensors = [image_transform(instance) for instance in request["instances"]]
+    def preprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
+        inputs = inputs["instances"][0]
+        customer_id = inputs["customer_id"]
+        
+        # search for candidates
+        hits = self.search_candidates(inputs["query_emb"], k=100)
+        
+        # get already bought items
+        already_bought_items_ids = self.get_already_bought_items_ids(customer_id)
 
-        # Transform to KServe v1/v2 inference protocol
-        if self.protocol == PredictorProtocol.GRPC_V2.value:
-            return self.v2_request_transform(numpy.asarray(input_tensors))
-        else:
-            inputs = [{"data": input_tensor.tolist()} for input_tensor in input_tensors]
-            request = {"instances": inputs}
-            return request
+        # build dataframes
+        item_id_list = []
+        item_emb_list = []
+        exclude_set = set(already_bought_items_ids)
+        for el in hits:
+            item_id = str(el["id"])
+            if item_id in exclude_set:
+                continue
+            item_emb = el["vector"]
+            item_id_list.append(item_id)
+            item_emb_list.append(item_emb)
+        item_id_df = pd.DataFrame({"article_id" : item_id_list})
+        item_emb_df = pd.DataFrame(item_emb_list).add_prefix("item_emb_")
 
-    def v2_request_transform(self, input_tensors):
-        request = ModelInferRequest()
-        request.model_name = self.name
-        input_0 = InferInput("INPUT__0", input_tensors.shape, "FP32")
-        input_0.set_data_from_numpy(input_tensors)
-        request.inputs.extend([input_0._get_tensor()])
-        if input_0._get_content() is not None:
-            request.raw_input_contents.extend([input_0._get_content()])
-        return request
+        # get articles feature vectors
+        articles_data = []
+        for article_id in item_id_list:
+            article_features = self.query_article_features(article_id)
+            if article_features:
+                articles_data.append(article_features)
+        articles_df = pd.DataFrame(data=articles_data, columns=self.articles_features)
 
-    def postprocess(self, infer_response: ModelInferResponse) -> Dict:
-        if self.protocol == PredictorProtocol.GRPC_V2.value:
-            response = InferResult(infer_response)
-            return {"predictions": response.as_numpy("OUTPUT__0").tolist()}
-        else:
-            return infer_response
+        # join candidates with item features
+        ranking_model_inputs = item_id_df.merge(articles_df, on="article_id", how="inner")
+        
+        # add customer features
+        customer_features = self.query_customer_features(customer_id)
+        ranking_model_inputs["age"] = customer_features[1]
+        ranking_model_inputs["month_sin"] = inputs["month_sin"]
+        ranking_model_inputs["month_cos"] = inputs["month_cos"]
+        ranking_model_inputs = ranking_model_inputs[self.ranking_model_feature_names]
+
+        r = { "inputs" : [{"ranking_features": ranking_model_inputs.values.tolist(), "article_ids": item_id_list} ]}
+        print(r)
+        return r
+
+
+    def postprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
+        print("============== preprocess ==============")
+        return inputs
     
+
+    #############
+
     def search_candidates(self, query_emb, k=100):
         res = client.search(
             collection_name=self.collection_name, 
             data=[query_emb], 
             ann_fields="vector",
             limit=k,
-            output_fields=["id"]
+            output_fields=["id", "vector"]
         )
-        return [item['id'] for item in res[0]]
+        return [item['entity'] for item in res[0]]
+
+    def get_already_bought_items_ids(self, customer_id):
+        with db_connection.cursor() as cursor:
+            query = f"SELECT article_id FROM rec_transactions WHERE customer_id = '{customer_id}'"
+            cursor.execute(query)
+            article_ids = [item[0] for item in cursor.fetchall()]
+        
+        return article_ids
+
+    # 예) ['108775015', 108775, 'Strap top', 253, 'Vest top', 'Garment Upper body', 1010016, 'Solid', 9, 'Black', 4, 'Dark', 5, 'Black', 1676, 'Jersey Basic', 'A', 'Ladieswear', 1, 'Ladieswear', 16, 'Womens Everyday Basics', 1002, 'Jersey Basic']
+    def query_article_features(self, article_id):
+        with db_connection.cursor() as cursor:
+            query = f"SELECT * FROM rec_articles WHERE article_id = {article_id}"
+            cursor.execute(query)
+            rows = cursor.fetchall()
+
+        article_features = list(rows[0]) if len(rows) > 0 else None
+        return article_features
+
+    def query_customer_features(self, customer_id):
+        with db_connection.cursor() as cursor:
+            customer_id="0095c9b47fc950788bb709201f024c5338838a27c59c0299b857f94b504cb9fc"
+            query = f"SELECT * FROM rec_customers WHERE customer_id = '{customer_id}'"
+            cursor.execute(query)
+            rows = cursor.fetchall()
+
+        customer_features = list(rows[0]) if len(rows) > 0 else None
+        return customer_features
 
 
-parser = argparse.ArgumentParser(parents=[model_server.parser])
+
+
+
+parser = argparse.ArgumentParser(parents=[model_server.parser], conflict_handler='resolve')
 parser.add_argument(
-    "--predictor_host", help="The URL for the model predict function", required=True
-)
-parser.add_argument(
-    "--protocol", help="The protocol for the predictor", default="v1"
+    "--predictor_host", help="The URL for the model predict function"
 )
 parser.add_argument(
     "--model_name", help="The name that the model is served under."
 )
-args, _ = parser.parse_known_args()
+args, _ = parser.parse_known_args()        
 
 if __name__ == "__main__":
-    model = ImageTransformer(args.model_name, predictor_host=args.predictor_host,
-                             protocol=args.protocol)
+    model = SampleTransformer(args.model_name, predictor_host=args.predictor_host)
     ModelServer(workers=1).start([model])
