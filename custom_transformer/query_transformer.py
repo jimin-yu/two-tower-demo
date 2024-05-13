@@ -32,7 +32,8 @@ class QueryTransformer(Model):
 
     def postprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
         print("============== preprocess ==============")
-        return inputs
+        ranking_output = self.call_ranking_model(inputs)
+        return ranking_output
 
     ##########    
 
@@ -56,7 +57,7 @@ class QueryTransformer(Model):
       return customer_features
     
     # FIXME: 클러스터 내부 호출하기
-    def call_ranking_model(self):
+    def call_ranking_model(self, inputs):
       model_name = 'custom-catboost-model'
       # host = 'knative-local-gateway.istio-system.svc.cluster.local'
       host = 'localhost'
@@ -66,35 +67,8 @@ class QueryTransformer(Model):
         'HOST': f"{model_name}.kserve-test.example.com",
         'Content-Type': 'application/json'
       }
-      data = {
-        "instances": [
-          {
-            "customer_id": "0095c9b47fc950788bb709201f024c5338838a27c59c0299b857f94b504cb9fc",
-            "month_sin": 1.2246467991473532e-16,
-            "query_emb": [
-              0.214135289,
-              0.571055949,
-              0.330709577,
-              -0.225899458,
-              -0.308674961,
-              -0.0115124583,
-              0.0730511621,
-              -0.495835781,
-              0.625569344,
-              -0.0438038409,
-              0.263472944,
-              -0.58485353,
-              -0.307070434,
-              0.0414443575,
-              -0.321789205,
-              0.966559
-            ],
-            "month_cos": -1
-          }
-        ]
-      }
-      response = requests.get(url, headers=headers, data=json.dumps(data))
-      print(response.json())
+      response = requests.post(url, headers=headers, data=json.dumps(inputs))
+      return response.json()
 
 parser = argparse.ArgumentParser(parents=[model_server.parser], conflict_handler='resolve')
 parser.add_argument(
@@ -107,5 +81,4 @@ args, _ = parser.parse_known_args()
 
 if __name__ == "__main__":
     model = QueryTransformer(args.model_name, predictor_host=args.predictor_host)
-    model.call_ranking_model()
-    # ModelServer(workers=1).start([model])
+    ModelServer(workers=1).start([model])
