@@ -81,7 +81,7 @@ class RankingTransformer(Model):
         ranking_model_inputs["month_cos"] = inputs["month_cos"]
         ranking_model_inputs = ranking_model_inputs[self.ranking_model_feature_names]
 
-        r = { "inputs" : [{"ranking_features": ranking_model_inputs.values.tolist(), "article_ids": item_id_list} ]}
+        r = { "inputs" : [{"ranking_features": ranking_model_inputs.to_dict(orient='records'), "article_ids": item_id_list} ]}
         print(r)
         return r
 
