@@ -30,8 +30,8 @@ class RankingTransformer(Model):
 
         # get feature views
         self.db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
-        self.articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=self.db_connection)
-        self.articles_features = self.articles_fv.columns.to_list()
+        articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=self.db_connection)
+        self.articles_features = articles_fv.columns.to_list()
         # self.customer_fv = pd.read_sql('SELECT * FROM rec_customers', con=self.db_connection)
         
         # TODO: model input schema 가져오는 부분 개선하기
@@ -125,7 +125,6 @@ class RankingTransformer(Model):
 
     def query_customer_features(self, customer_id):
         with self.db_connection.cursor() as cursor:
-            customer_id="0095c9b47fc950788bb709201f024c5338838a27c59c0299b857f94b504cb9fc"
             query = f"SELECT * FROM rec_customers WHERE customer_id = '{customer_id}'"
             cursor.execute(query)
             rows = cursor.fetchall()
