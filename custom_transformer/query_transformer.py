@@ -7,6 +7,8 @@ from db_config import *
 
 import numpy as np
 from datetime import datetime
+import requests
+import json
 
 class QueryTransformer(Model):
     def __init__(self, name: str, predictor_host: str):
@@ -51,7 +53,48 @@ class QueryTransformer(Model):
           rows = cursor.fetchall()
 
       customer_features = list(rows[0]) if len(rows) > 0 else None
-      return customer_features    
+      return customer_features
+    
+    # FIXME: 클러스터 내부 호출하기
+    def call_ranking_model(self):
+      model_name = 'custom-catboost-model'
+      # host = 'knative-local-gateway.istio-system.svc.cluster.local'
+      host = 'localhost'
+      port=8080
+      url = f"http://{host}:{port}/v1/models/{model_name}:predict"
+      headers = {
+        'HOST': f"{model_name}.kserve-test.example.com",
+        'Content-Type': 'application/json'
+      }
+      data = {
+        "instances": [
+          {
+            "customer_id": "0095c9b47fc950788bb709201f024c5338838a27c59c0299b857f94b504cb9fc",
+            "month_sin": 1.2246467991473532e-16,
+            "query_emb": [
+              0.214135289,
+              0.571055949,
+              0.330709577,
+              -0.225899458,
+              -0.308674961,
+              -0.0115124583,
+              0.0730511621,
+              -0.495835781,
+              0.625569344,
+              -0.0438038409,
+              0.263472944,
+              -0.58485353,
+              -0.307070434,
+              0.0414443575,
+              -0.321789205,
+              0.966559
+            ],
+            "month_cos": -1
+          }
+        ]
+      }
+      response = requests.get(url, headers=headers, data=json.dumps(data))
+      print(response.json())
 
 parser = argparse.ArgumentParser(parents=[model_server.parser], conflict_handler='resolve')
 parser.add_argument(
@@ -64,4 +107,5 @@ args, _ = parser.parse_known_args()
 
 if __name__ == "__main__":
     model = QueryTransformer(args.model_name, predictor_host=args.predictor_host)
-    ModelServer(workers=1).start([model])
+    model.call_ranking_model()
+    # ModelServer(workers=1).start([model])

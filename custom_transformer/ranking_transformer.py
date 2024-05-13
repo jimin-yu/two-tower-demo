@@ -29,9 +29,15 @@ class RankingTransformer(Model):
         self.collection_name = 'rec_candidate'
 
         # get feature views
-        self.db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
-        articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=self.db_connection)
-        self.articles_features = articles_fv.columns.to_list()
+        db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
+        with db_connection.cursor() as cursor:
+            query = "SHOW COLUMNS FROM rec_articles"
+            cursor.execute(query)
+            columns = cursor.fetchall()
+            self.articles_features = [column[0] for column in columns]
+
+        # articles_fv = pd.read_sql('SELECT * FROM rec_articles', con=self.db_connection)
+        # self.articles_features = articles_fv.columns.to_list()
         # self.customer_fv = pd.read_sql('SELECT * FROM rec_customers', con=self.db_connection)
         
         # TODO: model input schema 가져오는 부분 개선하기
@@ -106,7 +112,8 @@ class RankingTransformer(Model):
         return [item['entity'] for item in res[0]]
 
     def get_already_bought_items_ids(self, customer_id):
-        with self.db_connection.cursor() as cursor:
+        db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
+        with db_connection.cursor() as cursor:
             query = f"SELECT article_id FROM rec_transactions WHERE customer_id = '{customer_id}'"
             cursor.execute(query)
             article_ids = [item[0] for item in cursor.fetchall()]
@@ -115,7 +122,8 @@ class RankingTransformer(Model):
 
     # 예) ['108775015', 108775, 'Strap top', 253, 'Vest top', 'Garment Upper body', 1010016, 'Solid', 9, 'Black', 4, 'Dark', 5, 'Black', 1676, 'Jersey Basic', 'A', 'Ladieswear', 1, 'Ladieswear', 16, 'Womens Everyday Basics', 1002, 'Jersey Basic']
     def query_article_features(self, article_id):
-        with self.db_connection.cursor() as cursor:
+        db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
+        with db_connection.cursor() as cursor:
             query = f"SELECT * FROM rec_articles WHERE article_id = {article_id}"
             cursor.execute(query)
             rows = cursor.fetchall()
@@ -124,7 +132,8 @@ class RankingTransformer(Model):
         return article_features
 
     def query_customer_features(self, customer_id):
-        with self.db_connection.cursor() as cursor:
+        db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
+        with db_connection.cursor() as cursor:
             query = f"SELECT * FROM rec_customers WHERE customer_id = '{customer_id}'"
             cursor.execute(query)
             rows = cursor.fetchall()
