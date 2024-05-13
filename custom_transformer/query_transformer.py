@@ -35,8 +35,8 @@ class QueryTransformer(Model):
     def postprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
         print("============== postprocess ==============")
         print(inputs)
-        ranking_output = self.call_ranking_model(inputs)
-        return ranking_output
+        ranking_output = self.call_ranking_model({ "instances": inputs["predictions"] })
+        return {"predictions": ranking_output}
 
     ##########    
 
