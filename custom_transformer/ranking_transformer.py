@@ -145,5 +145,5 @@ parser.add_argument(
 args, _ = parser.parse_known_args()        
 
 if __name__ == "__main__":
-    model = SampleTransformer(args.model_name, predictor_host=args.predictor_host)
+    model = RankingTransformer(args.model_name, predictor_host=args.predictor_host)
     ModelServer(workers=1).start([model])
