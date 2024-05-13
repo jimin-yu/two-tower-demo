@@ -13,7 +13,6 @@ import json
 class QueryTransformer(Model):
     def __init__(self, name: str, predictor_host: str):
         super().__init__(name)
-        self.db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
         self.predictor_host = predictor_host
         self.ready = True
 
@@ -27,8 +26,11 @@ class QueryTransformer(Model):
         inputs["age"] = customer_features[1]
         inputs["month_sin"] = self.month_to_sin(month_of_purchase)
         inputs["month_cos"] = self.month_to_cos(month_of_purchase)
-                
-        return {"instances" : [inputs]}
+
+        print("============== preprocess ==============")
+        r = {"instances" : [inputs]}
+        print(r)
+        return r
 
     def postprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
         print("============== preprocess ==============")
@@ -48,7 +50,8 @@ class QueryTransformer(Model):
         return np.cos(month*C).item()
 
     def query_customer_features(self, customer_id):
-      with self.db_connection.cursor() as cursor:
+      db_connection = sql.connect(host=HOST, database=DATABASE_NAME, user=USERNAME, password=PASSWORD)
+      with db_connection.cursor() as cursor:
           query = f"SELECT * FROM rec_customers WHERE customer_id = '{customer_id}'"
           cursor.execute(query)
           rows = cursor.fetchall()
