@@ -64,9 +64,7 @@ class QueryTransformer(Model):
     def call_ranking_model(self, inputs):
       model_name = 'custom-catboost-model'
       # host = 'knative-local-gateway.istio-system.svc.cluster.local'
-      # host = 'localhost'
-      # host = 'host.minikube.internal'
-      host = 'knative-local-gateway.istio-system.svc.cluster.local'
+      host = 'host.minikube.internal'
       port=8080
       url = f"http://{host}:{port}/v1/models/{model_name}:predict"
       headers = {
