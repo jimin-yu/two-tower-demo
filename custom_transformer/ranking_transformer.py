@@ -88,8 +88,10 @@ class RankingTransformer(Model):
 
     def postprocess(self, inputs: Dict, headers: Dict[str, str] = None) -> Dict:
         print("============== preprocess ==============")
-        return inputs
-    
+        preds = inputs["predictions"]
+        ranking = list(zip(preds["scores"], preds["article_ids"])) # merge lists
+        ranking.sort(reverse=True) # sort by score (descending)
+        return { "ranking": ranking }
 
     #############
 
