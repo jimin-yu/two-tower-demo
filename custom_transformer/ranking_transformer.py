@@ -94,7 +94,7 @@ class RankingTransformer(Model):
     #############
 
     def search_candidates(self, query_emb, k=100):
-        res = client.search(
+        res = self.milvus_client.search(
             collection_name=self.collection_name, 
             data=[query_emb], 
             ann_fields="vector",
